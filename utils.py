@@ -2,6 +2,8 @@ import numpy as np
 import cv2
 import pathlib
 
+# img utils
+
 def normalize_to_uint8(img):
     if img.dtype == np.uint8:
         return img
@@ -26,13 +28,11 @@ def thermal_to_colormap(img):
     color = cv2.applyColorMap(img, cv2.COLORMAP_INFERNO)
     return cv2.cvtColor(color, cv2.COLOR_BGR2RGB)
 
+# registration utils
+
 def find_keypoints_and_descriptors(img, method):
     if method.lower() == "sift":
         feature_extractor = cv2.SIFT_create()
-    elif method.lower() == "surf":
-        feature_extractor = cv2.xfeatures2d.SURF_create()
-    elif method.lower() == "orb":
-        feature_extractor = cv2.ORB_create()
     else:
         raise ValueError(f"Unsupported method: {method}")
 
@@ -40,10 +40,8 @@ def find_keypoints_and_descriptors(img, method):
     return keypoints, descriptors
 
 def match_descriptors(desc1, desc2, method):
-    if method.lower() in ["sift", "surf"]:
+    if method.lower() == "sift":
         matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
-    elif method.lower() == "orb":
-        matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=True)
     else:
         raise ValueError(f"Unsupported method: {method}")
 
@@ -58,26 +56,7 @@ def compute_homography(kp1, kp2, matches):
     H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC)
     return H, mask
 
-
-# def crop_black_border(img):
-#     """Returns image with black border cropped from an RGB image"""
-
-#     if not (len(img.shape) == 3 and img.shape[2] == 3):
-#         raise ValueError("Input image must be a 3-channel RGB image")
-
-#     # convert to grayscale
-#     gray = cv2.cvtColor(img, cv2.COLOR_RGB2GRAY)
-
-#     # threshold the image to create a binary mask of the non-black pixels
-#     _, mask = cv2.threshold(gray, 1, 255, cv2.THRESH_BINARY)
-
-#     # find bounding box of the non-black pixels
-#     coords = cv2.findNonZero(mask)
-#     x, y, w, h = cv2.boundingRect(coords)
-
-#     cropped_img = img[y:y+h, x:x+w]
-
-#     return cropped_img
+# file utils
 
 def get_images(img_dir: pathlib.Path) -> list[pathlib.Path]:
     """Return a sorted list of images in a directory"""

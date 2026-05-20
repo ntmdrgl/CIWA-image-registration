@@ -31,7 +31,11 @@ def thermal_to_colormap(img):
 # registration utils
 
 def find_keypoints_and_descriptors(img, method):
-    if method.lower() == "sift":
+    img = normalize_to_uint8(img)
+    if img.ndim == 3:
+        img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+    if method == "sift":
         feature_extractor = cv2.SIFT_create()
     else:
         raise ValueError(f"Unsupported method: {method}")
@@ -40,20 +44,38 @@ def find_keypoints_and_descriptors(img, method):
     return keypoints, descriptors
 
 def match_descriptors(desc1, desc2, method):
-    if method.lower() == "sift":
-        matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=True)
+    if desc1 is None or desc2 is None:
+        return []
+
+    if method == "sift":
+        matcher = cv2.BFMatcher(cv2.NORM_L2, crossCheck=False)
     else:
         raise ValueError(f"Unsupported method: {method}")
 
-    matches = matcher.match(desc1, desc2)
-    matches = sorted(matches, key=lambda x: x.distance)
-    return matches
+    # Find the 2 nearest neighbors for each descriptor
+    matches = matcher.knnMatch(desc1, desc2, k=2)
 
-def compute_homography(kp1, kp2, matches):
+    # Apply Lowe's Ratio Test to filter good matches
+    good_matches = []
+    for pair in matches:
+        if len(pair) != 2:
+            continue
+        m1, m2 = pair
+        if m1.distance < 0.75 * m2.distance:
+            good_matches.append(m1)
+
+    # matches = matcher.match(desc1, desc2)
+    # matches = sorted(matches, key=lambda x: x.distance)
+    return sorted(good_matches, key=lambda x: x.distance)
+
+def compute_homography(kp1, kp2, matches, ransac_thresh=5.0):
+    if len(matches) < 4:
+        raise ValueError("At least 4 good matches are required to compute a homography.")
+
     src_pts = np.float32([kp1[m.queryIdx].pt for m in matches]).reshape(-1, 1, 2)
     dst_pts = np.float32([kp2[m.trainIdx].pt for m in matches]).reshape(-1, 1, 2)
 
-    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC)
+    H, mask = cv2.findHomography(src_pts, dst_pts, cv2.RANSAC, ransac_thresh)
     return H, mask
 
 # file utils
